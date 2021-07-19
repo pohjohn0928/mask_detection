@@ -1,0 +1,8 @@
+*.jpg
+mask_dataset
+haarcascades
+mask_model
+*.mp4
+.DS_Store
+.idea/
+venv
