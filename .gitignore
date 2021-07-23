@@ -6,3 +6,5 @@ mask_model
 .DS_Store
 .idea/
 venv
+*.jpg
+myself

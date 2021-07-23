@@ -2,13 +2,16 @@ import cv2
 import glob
 import numpy as np
 import tensorflow.keras as keras
-from tensorflow.python.keras.layers import Conv2D,Dense,MaxPool2D,Flatten
+from tensorflow.python.keras.layers import Conv2D,Dense,MaxPool2D,Flatten,Dropout
 from sklearn.model_selection import train_test_split
-import tensorflow as tf
 from sklearn.utils import shuffle
-from keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint,EarlyStopping
 
 class MaskModel:
+    def __init__(self):
+        self.pic_size = 200
+        self.error = 50
+
     def GetTrainData(self):
         num = 500
 
@@ -19,7 +22,7 @@ class MaskModel:
                 if i == num:
                     break
                 img = cv2.imread(image, cv2.IMREAD_GRAYSCALE)
-                img = cv2.resize(img, (200, 200)) / 255
+                img = cv2.resize(img, (self.pic_size, self.pic_size)) / 255
                 bad_wear_dataset.append(img)
 
 
@@ -30,7 +33,7 @@ class MaskModel:
                 if i == num:
                     break
                 img = cv2.imread(image, cv2.IMREAD_GRAYSCALE)
-                img = cv2.resize(img, (200, 200)) / 255
+                img = cv2.resize(img, (self.pic_size, self.pic_size)) / 255
                 good_wear_dataset.append(img)
 
         return bad_wear_dataset,good_wear_dataset
@@ -41,7 +44,7 @@ class MaskModel:
         model.add(Conv2D(filters=16,
                          kernel_size=(5, 5),
                          padding='same',
-                         input_shape=(200,200,1),
+                         input_shape=(self.pic_size,self.pic_size,1),
                          activation='relu'))
         model.add(MaxPool2D(pool_size=(2, 2)))
         model.add(Conv2D(filters=26,
@@ -49,9 +52,10 @@ class MaskModel:
                          padding='same',
                          activation='relu'))
         model.add(MaxPool2D(pool_size=(2, 2)))
-
+        model.add(Dropout(0.25))
         model.add(Flatten())
         model.add(Dense(128, activation='relu'))
+        model.add(Dropout(0.25))
         model.add(Dense(1, activation='sigmoid'))
 
         return model
@@ -63,7 +67,7 @@ class MaskModel:
         model.compile(loss=keras.losses.binary_crossentropy , optimizer='adam', metrics=['accuracy'])
 
         checkpoint_path = "mask_model/mask_model.hdf5"
-        model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+        model_checkpoint_callback = ModelCheckpoint(
             checkpoint_path,
             save_weights_only=True,
             monitor='val_accuracy',
@@ -71,13 +75,18 @@ class MaskModel:
             save_best_only=True,
             verbose=1)
 
+        earlystop_callback = EarlyStopping(
+            monitor='val_accuracy',
+            min_delta=0.0001,  # 精確度至少提高0.0001
+            patience=3)
+
         model.fit(x=x_train,
                   y=y_train,
                   validation_data=(x_test,y_test),
-                  epochs=10,
+                  epochs=1,
                   batch_size=32,
                   verbose=1,
-                  callbacks=[model_checkpoint_callback])
+                  callbacks=[model_checkpoint_callback,earlystop_callback])
 
     def predict(self,images):
         model = self.createModel()
@@ -85,56 +94,42 @@ class MaskModel:
         return model.predict(images)
 
 
-    def predict_pic(self,image):
-        img = cv2.resize(image, (200, 200)) / 255
+    def predict_single_pic(self,image):
+        # image = cv2.imread(image, cv2.IMREAD_GRAYSCALE)
+        img = cv2.resize(image, (self.pic_size, self.pic_size)) / 255
+        img = img.reshape(self.pic_size, self.pic_size, 1)
         img = np.array([img])
-        img = img.reshape(img.shape[0], 200, 200, 1)
         pre = self.predict([img])
         print(pre)
         return pre[0][0]
 
 
-model = MaskModel()
-bad_wear_dataset,good_wear_dataset = model.GetTrainData()
-print(f'good wear data: {len(good_wear_dataset)}')
-print(f'bad wear data: {len(bad_wear_dataset)}')
+def show_img(img):
+    cv2.imshow('img', img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
-bad_wear_labels = len(bad_wear_dataset) * [0]
-good_wear_labels = len(good_wear_dataset) * [1]
+def train():
+    model = MaskModel()
+    bad_wear_dataset,good_wear_dataset = model.GetTrainData()
+    print(f'good wear data: {len(good_wear_dataset)}')
+    print(f'bad wear data: {len(bad_wear_dataset)}')
 
-dataset = bad_wear_dataset + good_wear_dataset
-labels = bad_wear_labels + good_wear_labels
+    bad_wear_labels = len(bad_wear_dataset) * [0]
+    good_wear_labels = len(good_wear_dataset) * [1]
 
-dataset = np.array(dataset)
-labels = np.array(labels)
+    dataset = bad_wear_dataset + good_wear_dataset
+    labels = bad_wear_labels + good_wear_labels
 
-dataset = dataset.reshape(dataset.shape[0],200,200,1)
-dataset,labels = shuffle(dataset,labels)
-model.fit(dataset,labels)
+    dataset = np.array(dataset)
+    labels = np.array(labels)
 
-# path = 'mask_dataset/good_wear/0/00003_Mask.jpg'
-# img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
-# img = cv2.resize(img, (200, 200)) / 255
-# img = np.array([img])
-# img = img.reshape(img.shape[0],200,200,1)
-# pre = model.predict([img])
-# print(pre)
-# print(round(pre[0][0]))
-# def show(image):
-#     cv2.imshow('image', image)
-#     cv2.waitKey(0)
-#     cv2.destroyAllWindows()
-#
-#
-# image = 'myself1.jpg'
-# img = cv2.imread(image, cv2.IMREAD_GRAYSCALE)
-# img = cv2.resize(img, (200, 200)) / 255
-# img = np.array([img])
-# print(img.shape)
-# img = img.reshape(img.shape[0],200,200,1)
-#
+    dataset = dataset.reshape(dataset.shape[0],model.pic_size,model.pic_size,1)
+    dataset,labels = shuffle(dataset,labels)
+    model.fit(dataset,labels)
+
+# train()
+
 # model = MaskModel()
-# pre = model.predict(img)
-# print(pre)
-
-
+# img = 'myself/myself.png'
+# print(model.predict_single_pic(img))
