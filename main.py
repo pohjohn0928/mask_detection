@@ -45,15 +45,16 @@ if __name__ == '__main__':
 
         if hit == 1:
             pre = model.predict_single_pic(input)
-            cv2.putText(img, f'confidence:{pre}', (x, y), font, 0.5, (11, 255, 255), 2, cv2.LINE_AA)
-            pre = round(pre)
-            if pre == 1:
+            label = round(pre)
+            if label == 1:
                 print('Good')
-                cv2.putText(img, f'good wear', (x, y + h), font, 2, (0, 0, 255), 2, cv2.LINE_AA)
+                cv2.putText(img, f'confidence:{pre}', (x, y), font, 0.5, (11, 255, 255), 2, cv2.LINE_AA)
+                cv2.putText(img, f'good wear', (x, y + h), font, 2, (0, 255, 0), 2, cv2.LINE_AA)
                 save_img('good', img)
-            if pre == 0:
+            if label == 0:
                 print('bad')
-                cv2.putText(img, f'bad wear', (x, y + h), font, 2, (0, 255, 0), 2, cv2.LINE_AA)
+                cv2.putText(img, f'confidence:{1 - pre}', (x, y), font, 0.5, (11, 255, 255), 2, cv2.LINE_AA)
+                cv2.putText(img, f'bad wear', (x, y + h), font, 2, (0, 0, 255), 2, cv2.LINE_AA)
                 save_img('bad', img)
 
         cv2.imshow('img', img)
